@@ -44,6 +44,7 @@ def predict_mood_from_mp3(file_path):
     predictions = model.predict(mfcc_scaled)
     predicted_index = np.argmax(predictions)
     predicted_mood = encoder.inverse_transform([predicted_index])[0]
+    # return predicted_mood
     return predicted_mood
 
 def mood_index_to_label(index):
@@ -56,6 +57,6 @@ def mood_index_to_label(index):
     return mood_labels.get(index, "Unknown")
 
 file_path = r"D:\\Projects\\Sonex\\music-classifier-service\\music-classifier-service\\sampletracks\\sample.mp3"
-
 # mood = predict_mood_from_mp3(file_path)
+# print("Predicted mood:", mood)
 # mood = mood_index_to_label(mood)
