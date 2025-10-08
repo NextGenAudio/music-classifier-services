@@ -4,6 +4,7 @@ from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
 from predict_mood import predict_mood_from_mp3, mood_index_to_label
 import logging
+from predict_mood_v2 import feature_extractor, predict_decode
 
 logger = logging.getLogger("my_fastapi_app")
 logger.setLevel(logging.INFO)
@@ -52,8 +53,10 @@ async def consume():
             if not isinstance(data,dict):
                 logger.error(f"Message value is not a dict: {data}")
                 continue
-            mood = predict_mood_from_mp3(data.get("storageUrl"))   # call your function
-            mood = mood_index_to_label(mood)
+            feature1 = feature_extractor(data.get("storageUrl")).reshape(1,162) 
+            mood = predict_decode(feature1)
+            # mood = predict_mood_from_mp3(data.get("storageUrl"))   
+            # mood = mood_index_to_label(mood)
             await send_message(producer=producer, message={"mood": mood,"fileId": data.get("fileId")})
             logger.info(f"Processed message with mood: {mood}")
     finally:
