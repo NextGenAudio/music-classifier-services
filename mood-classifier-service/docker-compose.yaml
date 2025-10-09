@@ -27,5 +27,18 @@ services:
         volumes:
           - kafka_kraft:/var/lib/kafka/data
 
+    
+    mood-classifier:
+        build: .
+        container_name: mood-classifier-service
+        ports:
+        - "8001:8001"
+        environment:
+        - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+        depends_on:
+        - kafka
+        volumes:
+        - ./sampletracks:/app/sampletracks
+
 volumes:
   kafka_kraft:
