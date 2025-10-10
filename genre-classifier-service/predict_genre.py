@@ -280,6 +280,10 @@ def predict_genre_from_mp3(file_path):
         
         print(f"Model predictions: {predictions}")
         print(f"Predicted index: {predicted_index}")
+        print(f"Predicted index type: {type(predicted_index)}")
+        
+        # Convert numpy integer to Python int for consistency
+        predicted_index = int(predicted_index)
         
         # Use encoder if available, otherwise return the index
         if encoder is not None:
@@ -330,6 +334,9 @@ def predict_genre_from_mp3(file_path):
             return f"Error extracting features: {fallback_error}"
 
 def genre_index_to_label(index):
+    # Debug: print the input index and its type
+    print(f"genre_index_to_label received: {index} (type: {type(index)})")
+    
     genre_labels = {
         0: "blues",
         1: "classical",
@@ -342,7 +349,17 @@ def genre_index_to_label(index):
         8: "reggae",
         9: "rock"
     }
-    return genre_labels.get(index, "Unknown")
+    
+    # Convert to int in case it's a numpy integer
+    try:
+        index = int(index)
+    except (ValueError, TypeError):
+        print(f"Warning: Could not convert index {index} to int")
+        return "Unknown"
+    
+    result = genre_labels.get(index, "Unknown")
+    print(f"genre_index_to_label returning: {result}")
+    return result
 
 # file_path = r"assets/sampletracks/sample.mp3"
 # genre = predict_genre_from_mp3(file_path)
