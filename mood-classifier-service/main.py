@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 import uvicorn
 from kafka_consumer import consume
-from predict_mood import predict_mood_from_mp3, mood_index_to_label
+from predict_mood_v2 import predict_mood_from_mp3, mood_index_to_label
 import asyncio
 from contextlib import asynccontextmanager
 

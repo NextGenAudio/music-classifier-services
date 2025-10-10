@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     gcc \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker layer caching

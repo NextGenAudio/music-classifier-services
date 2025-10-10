@@ -1,10 +1,10 @@
 import asyncio
 import json
+import os
 from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
-from predict_mood import predict_mood_from_mp3, mood_index_to_label
 import logging
-from predict_mood_v2 import feature_extractor, predict_decode
+from predict_mood_v2 import feature_extractor, predict_mood_from_features, predict_mood_from_mp3
 
 logger = logging.getLogger("my_fastapi_app")
 logger.setLevel(logging.INFO)
@@ -15,7 +15,7 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.propagate = True
 
-KAFKA_BOOTSTRAP_SERVERS= "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092") # Use service name in Docker
 KAFKA_TOPIC_RECIEVED = "audio.uploaded"
 KAFKA_TOPIC_PROCESSED = "audio.processed"
 GROUP_ID = "audio-service-group"
@@ -53,10 +53,14 @@ async def consume():
             if not isinstance(data,dict):
                 logger.error(f"Message value is not a dict: {data}")
                 continue
-            feature1 = feature_extractor(data.get("storageUrl")).reshape(1,162) 
-            mood = predict_decode(feature1)
-            # mood = predict_mood_from_mp3(data.get("storageUrl"))   
-            # mood = mood_index_to_label(mood)
+            
+            # Use the updated v2 prediction function
+            mood = predict_mood_from_mp3(data.get("storageUrl"))
+            
+            # Alternative: Extract features manually (if needed)
+            # feature1 = feature_extractor(data.get("storageUrl")).reshape(1,162) 
+            # mood = predict_mood_from_features(feature1)
+            
             await send_message(producer=producer, message={"mood": mood,"fileId": data.get("fileId")})
             logger.info(f"Processed message with mood: {mood}")
     finally:

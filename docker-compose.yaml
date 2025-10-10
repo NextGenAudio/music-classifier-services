@@ -2,6 +2,7 @@ services:
     kafka:
         image: confluentinc/cp-kafka:7.8.3
         container_name: kafka
+        # hostname: kafka
         ports:
             - "9092:9092"
         environment:
@@ -26,19 +27,37 @@ services:
             KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
         volumes:
           - kafka_kraft:/var/lib/kafka/data
+        # networks:
+        #   - app-network
+        healthcheck:
+            test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 || exit 1"]
+            interval: 30s
+            timeout: 15s
+            retries: 5
+            start_period: 60s
+        
+
 
     
-    mood-classifier:
-        build: .
-        container_name: mood-classifier-service
-        ports:
-        - "8001:8001"
-        environment:
-        - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-        depends_on:
-        - kafka
-        volumes:
-        - ./sampletracks:/app/sampletracks
+#     mood-classifier:
+#         build: ./mood-classifier-service
+#         container_name: mood-classifier-service
+#         hostname: mood-classifier-service
+#         ports:
+#         - "8001:8001"
+#         environment:
+#         - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#         depends_on:
+#         - kafka
+#         volumes:
+#         - ./sampletracks:/app/sampletracks
+#         networks:
+#         - app-network
 
+# networks:
+#   app-network:
+#     driver: bridge
+#     name: music-classifier-network
+    
 volumes:
   kafka_kraft:
