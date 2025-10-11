@@ -17,7 +17,7 @@ logger.propagate = True
 
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092") # Use service name in Docker
 KAFKA_TOPIC_RECIEVED = "audio.uploaded.mood"
-KAFKA_TOPIC_PROCESSED = "mood.processed"
+KAFKA_TOPIC_PROCESSED = "audio.processed.mood"
 GROUP_ID = "mood-service-group"
 
 async def send_message(producer: AIOKafkaProducer, message: dict):

@@ -16,7 +16,7 @@ logger.propagate = True
 
 KAFKA_BOOTSTRAP_SERVERS= "localhost:9092"
 KAFKA_TOPIC_RECIEVED = "audio.uploaded.genre"
-KAFKA_TOPIC_PROCESSED = "genre.processed"
+KAFKA_TOPIC_PROCESSED = "audio.processed.genre"
 GROUP_ID = "genre-service-group"
 
 async def send_message(producer: AIOKafkaProducer, message: dict):
