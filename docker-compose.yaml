@@ -1,63 +1,100 @@
+version: "3.9"
+
 services:
-    kafka:
-        image: confluentinc/cp-kafka:7.8.3
-        container_name: kafka
-        # hostname: kafka
-        ports:
-            - "9092:9092"
-        environment:
-            KAFKA_KRAFT_MODE: "true"
-            CLUSTER_ID: "kafka-cluster-1"
-            KAFKA_NODE_ID: 1
-            KAFKA_PROCESS_ROLES: "broker,controller"
-            KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-            
-            KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'  # Enable auto topic creation
-            # Fixed configuration for group coordinator
-            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-            KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-            
-            KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-            KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-            
-            KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
-        volumes:
-          - kafka_kraft:/var/lib/kafka/data
-        # networks:
-        #   - app-network
-        healthcheck:
-            test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 || exit 1"]
-            interval: 30s
-            timeout: 15s
-            retries: 5
-            start_period: 60s
-        
+  # ---------------------------------------------------
+  # Kafka Broker (Single-node KRaft mode)
+  # ---------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.8.3
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_KRAFT_MODE: "true"
+      CLUSTER_ID: "kafka-cluster-1"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
 
+      # Auto topic creation & replication
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
-    
-#     mood-classifier:
-#         build: ./mood-classifier-service
-#         container_name: mood-classifier-service
-#         hostname: mood-classifier-service
-#         ports:
-#         - "8001:8001"
-#         environment:
-#         - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-#         depends_on:
-#         - kafka
-#         volumes:
-#         - ./sampletracks:/app/sampletracks
-#         networks:
-#         - app-network
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
 
-# networks:
-#   app-network:
-#     driver: bridge
-#     name: music-classifier-network
-    
+      # Logging
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+    volumes:
+      - kafka_kraft:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    networks:
+      - app-network
+
+  # ---------------------------------------------------
+  # Mood Classifier Service (MCS)
+  # ---------------------------------------------------
+  mood-classifier:
+    build:
+      context: ./mood-classifier-service
+      dockerfile: Dockerfile
+    container_name: mood-classifier
+    ports:
+      - "8001:8001"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_AUDIO_UPLOADED: audio_uploaded_event
+      TOPIC_MOOD_CLASSIFIED: mood_classified_event
+      GROUP_ID: mcs-group
+    volumes:
+      - ./mood-classifier-service/sampletracks:/app/sampletracks
+      - ./mood-classifier-service/models:/app/models
+    networks:
+      - app-network
+
+  # ---------------------------------------------------
+  # Genre Classifier Service (GCS)
+  # ---------------------------------------------------
+  genre-classifier:
+    build:
+      context: ./genre-classifier-service
+      dockerfile: Dockerfile
+    container_name: genre-classifier
+    ports:
+      - "8002:8002"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_AUDIO_UPLOADED: audio_uploaded_event
+      TOPIC_GENRE_CLASSIFIED: genre_classified_event
+      GROUP_ID: gcs-group
+    volumes:
+      - ./genre-classifier-service/models:/app/models
+    networks:
+      - app-network
+
+# ---------------------------------------------------
+# Volumes & Networks
+# ---------------------------------------------------
 volumes:
   kafka_kraft:
+
+networks:
+  app-network:
+    driver: bridge
