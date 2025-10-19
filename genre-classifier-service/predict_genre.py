@@ -288,7 +288,11 @@ def predict_genre_from_mp3(file_path):
         # Use encoder if available, otherwise return the index
         if encoder is not None:
             predicted_genre = encoder.inverse_transform([predicted_index])[0]
-            return predicted_genre
+            print(f"Encoder returned: {predicted_genre} (type: {type(predicted_genre)})")
+            # Ensure it's a regular Python string
+            if hasattr(predicted_genre, 'item'):
+                predicted_genre = predicted_genre.item()
+            return str(predicted_genre)
         else:
             return predicted_index
             
@@ -317,7 +321,11 @@ def predict_genre_from_mp3(file_path):
                     mfcc_flattened = mfcc_flattened[:, :44100]
             
             # Normalize
-            mfcc_scaled = scaler.transform(mfcc_flattened)
+            if scaler is not None:
+                mfcc_scaled = scaler.transform(mfcc_flattened)
+            else:
+                print("Warning: No scaler available, using raw MFCC features")
+                mfcc_scaled = mfcc_flattened
 
             # Predict
             predictions = model.predict(mfcc_scaled)
@@ -325,7 +333,10 @@ def predict_genre_from_mp3(file_path):
             
             if encoder is not None:
                 predicted_genre = encoder.inverse_transform([predicted_index])[0]
-                return predicted_genre
+                # Ensure it's a regular Python string
+                if hasattr(predicted_genre, 'item'):
+                    predicted_genre = predicted_genre.item()
+                return str(predicted_genre)
             else:
                 return predicted_index
                 
@@ -339,7 +350,7 @@ def genre_index_to_label(index):
     
     genre_labels = {
         0: "blues",
-        1: "classical",
+        1: "classical", 
         2: "country",
         3: "disco",
         4: "hiphop",
@@ -349,6 +360,11 @@ def genre_index_to_label(index):
         8: "reggae",
         9: "rock"
     }
+    
+    # If it's already a string (genre label), return it directly
+    if isinstance(index, str):
+        print(f"Input is already a string genre label: {index}")
+        return index
     
     # Convert to int in case it's a numpy integer
     try:

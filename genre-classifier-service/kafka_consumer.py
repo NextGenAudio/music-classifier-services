@@ -4,6 +4,7 @@ from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
 from predict_genre import predict_genre_from_mp3, genre_index_to_label
 import logging
+import os
 
 logger = logging.getLogger("genre_classifier_app")
 logger.setLevel(logging.INFO)
@@ -14,7 +15,7 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.propagate = True
 
-KAFKA_BOOTSTRAP_SERVERS= "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS= os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC_RECIEVED = "audio.uploaded.genre"
 KAFKA_TOPIC_PROCESSED = "audio.processed.genre"
 GROUP_ID = "genre-service-group"
@@ -52,8 +53,18 @@ async def consume():
             if not isinstance(data,dict):
                 logger.error(f"Message value is not a dict: {data}")
                 continue
-            genre = predict_genre_from_mp3(data.get("storageUrl"))   # call your function
-            genre = genre_index_to_label(genre)
+            
+            # Get the raw prediction result
+            genre_result = predict_genre_from_mp3(data.get("storageUrl"))
+            
+            # Check if result is already a string (genre label) or int (index)
+            if isinstance(genre_result, str):
+                # Already a genre label, use directly
+                genre = genre_result
+            else:
+                # It's an index, convert to label
+                genre = genre_index_to_label(genre_result)
+            
             await send_message(producer=producer, message={"genre": genre,"fileId": data.get("fileId")})
             logger.info(f"Processed message with genre: {genre}")
     finally:

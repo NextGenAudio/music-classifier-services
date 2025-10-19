@@ -15,3 +15,6 @@ my-venv/
 # Deep learning model
 **/assets/*.h5
 **/assets/*.pkl
+
+# Specific model files
+genre_model.h5
