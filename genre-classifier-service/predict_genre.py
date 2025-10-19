@@ -9,18 +9,22 @@ import requests
 from urllib.parse import urlparse
 from scipy.ndimage import zoom
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(BASE_DIR, "assets", "genre_model.h5")
+encoder_path = os.path.join(BASE_DIR, "assets", "label_encoder.pkl")
+scaler_path = os.path.join(BASE_DIR, "assets", "scaler.pkl")
+
 # Load model files with error handling for development/demo purposes
 try:
-    model = keras.models.load_model(r"assets/genre_model.h5")
-    scaler = joblib.load(r"assets/scaler.pkl")
-    encoder = joblib.load(r"assets/label_encoder.pkl")
+    model = keras.models.load_model(model_path)
+    scaler = joblib.load(scaler_path)
+    encoder = joblib.load(encoder_path)
     print("Genre model files loaded successfully!")
 except Exception as e:
     print(f"Warning: Genre model files not found ({e}). Service will return demo results.")
     model = None
     scaler = None
     encoder = None
-
 
 # === S3 Download Function ===
 def download_from_s3(s3_url):

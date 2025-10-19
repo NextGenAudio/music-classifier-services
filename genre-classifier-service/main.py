@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/getgenre")
-def read_root(file_path: str = "genre_classifier_service/sampletracks/sample.mp3"):
+def read_root(file_path: str = r"/app/sampletracks/sample1.wav"):
     genre = predict_genre_from_mp3(file_path)
     genre = genre_index_to_label(genre)
     return {"genre": genre}
