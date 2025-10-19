@@ -7,30 +7,44 @@ import tempfile
 import requests
 import os
 import keras
+import logging
+
+logger = logging.getLogger("my_fastapi_app")
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+if not logger.hasHandlers():
+    logger.addHandler(handler)
+logger.propagate = True
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(BASE_DIR, "assets", "mood_model_v2.h5")
+encoder_path = os.path.join(BASE_DIR, "assets", "label_encoder_v2.pkl")
 
 # Load model and encoders
 try:
-    model = keras.models.load_model(r"assets/mood_model_v2.h5")
+    model = keras.models.load_model(model_path)
     print("Model loaded successfully")
 except Exception as e:
     print(f"Error loading model: {e}")
     model = None
 
 try:
-    encoder = joblib.load(r"assets/label_encoder_v2.pkl")
+    encoder = joblib.load(encoder_path)
     print("Label encoder loaded successfully")
 except Exception as e:
     print(f"Error loading label encoder: {e}")
     encoder = None
 
 # Note: scaler.pkl doesn't exist, you may need to create it or use a different approach
-scaler = None
-try:
-    scaler = joblib.load(r"assets/scaler.pkl")
-    print("Scaler loaded successfully")
-except Exception as e:
-    print(f"Warning: Scaler not found: {e}")
-    print("You may need to create a scaler for feature normalization")
+# scaler = None
+# try:
+#     scaler = joblib.load(r"assets/scaler.pkl")
+#     print("Scaler loaded successfully")
+# except Exception as e:
+#     print(f"Warning: Scaler not found: {e}")
+#     print("You may need to create a scaler for feature normalization")
 
 
 # === S3 Download Function ===
@@ -181,8 +195,6 @@ def extract_mfcc_from_mp3(file_path, max_len=130, n_mfcc=20):
 
 
 
-
-
 # function for Music Information Retrieval
 def extract_features(data, sample_rate):
     result = np.array([])
@@ -263,19 +275,19 @@ def predict_mood_from_mp3(file_path):
             actual_file_path = file_path
         
         # Extract comprehensive features
-        features = feature_extractor(actual_file_path)
+        features = feature_extractor(actual_file_path).reshape(1,162)
         if features is None:
             return "Error extracting features"
         
         # Scale features (if scaler is available)
-        if scaler is not None:
-            features_scaled = scaler.transform(features.reshape(1, -1))
-        else:
-            print("Warning: No scaler available, using raw features")
-            features_scaled = features.reshape(1, -1)
+        # if scaler is not None:
+        #     features_scaled = scaler.transform(features.reshape(1, -1))
+        # else:
+        #     print("Warning: No scaler available, using raw features")
+        #     features_scaled = features.reshape(1, -1)
         
         # Predict mood
-        mood = predict_mood_from_features(features_scaled)
+        mood = predict_decode(features)
         
         return mood
         
@@ -288,30 +300,18 @@ def predict_mood_from_mp3(file_path):
             print(f"Cleaning up temporary file: {temp_file_path}")
             os.unlink(temp_file_path)
 
-def mood_index_to_label(index):
-    """Convert mood index to human-readable label"""
-    mood_labels = {
-        0: "happy",
-        1: "sad", 
-        2: "relax",
-        3: "angry",
-        4: "energetic"  # assuming 5 classes based on the loop
-    }
-    return mood_labels.get(index, "Unknown")
+def predict_decode(feature):
+    predict = np.argmax(model.predict(feature))
+    predict_encode = np.array([])
+    for i in range(5):
+        if i == predict:
+            predict_encode = np.append(predict_encode,[1])
+        else:
+            predict_encode = np.append(predict_encode,[0])
+    predict_encode = predict_encode.reshape(1,-1)
+    predict_decode = encoder.inverse_transform(predict_encode)
+    return predict_decode[0][0]
 
-# Test function
-def test_prediction():
-    """Test the prediction with a sample file"""
-    sample_file = r"sampletracks/sample.mp3"
-    if os.path.exists(sample_file):
-        print(f"Testing prediction with: {sample_file}")
-        mood = predict_mood_from_mp3(sample_file)
-        print(f"Predicted mood: {mood}")
-    else:
-        print(f"Sample file not found: {sample_file}")
-
-if __name__ == "__main__":
-    test_prediction()
 
 # Remove the test code at the bottom
 # feature1 = feature_extractor(r"D:\Projects\Sonex\music-classifier-service\music-classifier-service\sampletracks\sample.mp3").reshape(1,162)  

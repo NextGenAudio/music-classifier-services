@@ -4,17 +4,6 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for audio processing and ML libraries
-RUN apt-get update && apt-get install -y \
-    libsndfile1 \
-    ffmpeg \
-    libfftw3-dev \
-    pkg-config \
-    gcc \
-    g++ \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 

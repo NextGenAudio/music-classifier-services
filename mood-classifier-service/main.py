@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 import uvicorn
 from kafka_consumer import consume
-from predict_mood_v2 import predict_mood_from_mp3, mood_index_to_label
+from predict_mood_v2 import predict_mood_from_mp3
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -14,9 +14,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/getmood")
-def read_root(file_path: str = "music_classifier_service/sampletracks/sample.mp3"):
+def read_root(file_path: str = r"/app/sampletracks/sample1.wav"):
     mood = predict_mood_from_mp3(file_path)
-    mood = mood_index_to_label(mood)
+    
     return {"mood": mood}
 
 
