@@ -15,7 +15,7 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.propagate = True
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092") # Use service name in Docker
+KAFKA_BOOTSTRAP_SERVERS = "lboot-ctavlxrz.c2.kafka-serverless.us-east-1.amazonaws.com:9098"
 KAFKA_TOPIC_RECIEVED = "audio.uploaded.mood"
 KAFKA_TOPIC_PROCESSED = "audio.processed.mood"
 GROUP_ID = "mood-service-group"
