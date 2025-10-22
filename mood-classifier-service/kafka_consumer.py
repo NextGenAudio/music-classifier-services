@@ -1,9 +1,11 @@
 import asyncio
 import json
 import os
+import socket
 from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
 import logging
+from aws_msk_iam_sasl_signer import MSKAuthTokenProvider
 from predict_mood_v2 import feature_extractor, predict_mood_from_features, predict_mood_from_mp3
 
 logger = logging.getLogger("my_fastapi_app")
@@ -15,10 +17,23 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.propagate = True
 
+class MSKTokenProvider():
+    def token(self):
+        token, _ = MSKAuthTokenProvider.generate_auth_token('us-east-1')
+        return token
+
 KAFKA_BOOTSTRAP_SERVERS = "boot-ctavlxrz.c2.kafka-serverless.us-east-1.amazonaws.com:9098"
 KAFKA_TOPIC_RECIEVED = "audio.uploaded.mood"
 KAFKA_TOPIC_PROCESSED = "audio.processed.mood"
 GROUP_ID = "mood-service-group"
+
+# Kafka security configuration
+KAFKA_SECURITY_CONFIG = {
+    'security_protocol': 'SASL_SSL',
+    'sasl_mechanism': 'OAUTHBEARER',
+    'sasl_oauth_token_provider': MSKTokenProvider(),
+    'client_id': socket.gethostname()
+}
 
 async def send_message(producer: AIOKafkaProducer, message: dict):
     """Send a JSON message to Kafka"""
@@ -31,10 +46,12 @@ async def consume():
         KAFKA_TOPIC_RECIEVED,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         group_id=GROUP_ID,
-        value_deserializer=lambda v: json.loads(v.decode("utf-8"))
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        **KAFKA_SECURITY_CONFIG
     )
     producer = AIOKafkaProducer(
-        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        **KAFKA_SECURITY_CONFIG
     )
     await consumer.start()
     await producer.start()
