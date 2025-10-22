@@ -1,10 +1,12 @@
 import asyncio
 import json
+import socket
 from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
 from predict_genre import predict_genre_from_mp3, genre_index_to_label
 import logging
 import os
+from aws_msk_iam_sasl_signer import MSKAuthTokenProvider
 
 logger = logging.getLogger("genre_classifier_app")
 logger.setLevel(logging.INFO)
@@ -15,10 +17,23 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.propagate = True
 
-KAFKA_BOOTSTRAP_SERVERS= "boot-ctavlxrz.c2.kafka-serverless.us-east-1.amazonaws.com:9098"
+class MSKTokenProvider():
+    def token(self):
+        token, _ = MSKAuthTokenProvider.generate_auth_token('us-east-1')
+        return token
+
+KAFKA_BOOTSTRAP_SERVERS = "boot-ctavlxrz.c2.kafka-serverless.us-east-1.amazonaws.com:9098"
 KAFKA_TOPIC_RECIEVED = "audio.uploaded.genre"
 KAFKA_TOPIC_PROCESSED = "audio.processed.genre"
 GROUP_ID = "genre-service-group"
+
+# Kafka security configuration
+KAFKA_SECURITY_CONFIG = {
+    'security_protocol': 'SASL_SSL',
+    'sasl_mechanism': 'OAUTHBEARER',
+    'sasl_oauth_token_provider': MSKTokenProvider(),
+    'client_id': socket.gethostname()
+}
 
 async def send_message(producer: AIOKafkaProducer, message: dict):
     """Send a JSON message to Kafka"""
@@ -31,10 +46,12 @@ async def consume():
         KAFKA_TOPIC_RECIEVED,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         group_id=GROUP_ID,
-        value_deserializer=lambda v: json.loads(v.decode("utf-8"))
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        **KAFKA_SECURITY_CONFIG
     )
     producer = AIOKafkaProducer(
-        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        **KAFKA_SECURITY_CONFIG
     )
     await consumer.start()
     await producer.start()
