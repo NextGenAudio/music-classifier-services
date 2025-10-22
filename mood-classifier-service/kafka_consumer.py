@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import socket
+import ssl
 from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
 import logging
@@ -17,8 +18,10 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.propagate = True
 
-class MSKTokenProvider():
-    def token(self):
+from aiokafka.abc import AbstractTokenProvider
+
+class MSKTokenProvider(AbstractTokenProvider):
+    async def token(self):
         token, _ = MSKAuthTokenProvider.generate_auth_token('us-east-1')
         return token
 
@@ -27,12 +30,16 @@ KAFKA_TOPIC_RECIEVED = "audio.uploaded.mood"
 KAFKA_TOPIC_PROCESSED = "audio.processed.mood"
 GROUP_ID = "mood-service-group"
 
+# Create SSL context for Kafka
+ssl_context = ssl.create_default_context()
+
 # Kafka security configuration
 KAFKA_SECURITY_CONFIG = {
     'security_protocol': 'SASL_SSL',
     'sasl_mechanism': 'OAUTHBEARER',
     'sasl_oauth_token_provider': MSKTokenProvider(),
-    'client_id': socket.gethostname()
+    'client_id': socket.gethostname(),
+    'ssl_context': ssl_context
 }
 
 async def send_message(producer: AIOKafkaProducer, message: dict):
