@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "mood-classifier-service"
+		},
+		{
+			"path": "genre-classifier-service"
+		}
+	],
+	"settings": {}
+}
