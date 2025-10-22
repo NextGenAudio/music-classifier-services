@@ -55,29 +55,85 @@ async def create_kafka_topics():
         await admin_client.start()
         logger.info("Admin client connected to Kafka")
         
-        # Define topics to create
-        topics = [
-            NewTopic(
-                name=KAFKA_TOPIC_RECIEVED,
-                num_partitions=3
-            ),
-            NewTopic(
-                name=KAFKA_TOPIC_PROCESSED,
-                num_partitions=3
+        # Get existing topics
+        metadata = await admin_client.list_topics()
+        existing_topics = metadata
+        
+        topics_to_create = []
+        
+        # Check and add KAFKA_TOPIC_RECIEVED if it doesn't exist
+        if KAFKA_TOPIC_RECIEVED not in existing_topics:
+            topics_to_create.append(
+                NewTopic(
+                    name=KAFKA_TOPIC_RECIEVED,
+                    num_partitions=3
+                )
             )
-        ]
+            logger.info(f"Will create topic: {KAFKA_TOPIC_RECIEVED}")
+        else:
+            logger.info(f"✓ Topic already exists: {KAFKA_TOPIC_RECIEVED}")
         
-        # Create topics
-        await admin_client.create_topics(topics)
-        logger.info(f"✓ Topics created: {KAFKA_TOPIC_RECIEVED}, {KAFKA_TOPIC_PROCESSED}")
+        # Check and add KAFKA_TOPIC_PROCESSED if it doesn't exist
+        if KAFKA_TOPIC_PROCESSED not in existing_topics:
+            topics_to_create.append(
+                NewTopic(
+                    name=KAFKA_TOPIC_PROCESSED,
+                    num_partitions=3
+                )
+            )
+            logger.info(f"Will create topic: {KAFKA_TOPIC_PROCESSED}")
+        else:
+            logger.info(f"✓ Topic already exists: {KAFKA_TOPIC_PROCESSED}")
         
-    except TopicAlreadyExistsError:
-        logger.info("✓ Topics already exist")
+        # Create topics only if there are any to create
+        if topics_to_create:
+            await admin_client.create_topics(topics_to_create)
+            logger.info(f"✓ Successfully created {len(topics_to_create)} topic(s)")
+            
+            # Wait for topics to be available in cluster metadata
+            logger.info("Waiting for topics to be available in cluster...")
+            await asyncio.sleep(5)
+        else:
+            logger.info("✓ All topics already exist, nothing to create")
+        
+        return True
+        
     except Exception as e:
-        logger.warning(f"Topic creation note: {e}")
-        # Don't fail if topics already exist or other non-critical errors
+        logger.error(f"Topic creation failed: {e}")
+        return False
     finally:
         await admin_client.close()
+        
+async def wait_for_topic(topic_name: str, max_retries: int = 10, delay: int = 3):
+    """Wait for a topic to be available in cluster metadata"""
+    for attempt in range(max_retries):
+        admin_client = AIOKafkaAdminClient(
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+            **KAFKA_SECURITY_CONFIG
+        )
+        
+        try:
+            await admin_client.start()
+            metadata = await admin_client.list_topics()
+            
+            if topic_name in metadata:
+                logger.info(f"✓ Topic {topic_name} is now available in cluster")
+                await admin_client.close()
+                return True
+            
+            logger.info(f"Waiting for topic {topic_name}... (attempt {attempt + 1}/{max_retries})")
+            await admin_client.close()
+            await asyncio.sleep(delay)
+            
+        except Exception as e:
+            logger.warning(f"Error checking topic: {e}")
+            if admin_client:
+                await admin_client.close()
+            await asyncio.sleep(delay)
+    
+    logger.error(f"Topic {topic_name} not available after {max_retries} attempts")
+    return False
+
 
 async def send_message(producer: AIOKafkaProducer, message: dict):
     """Send a JSON message to Kafka"""
@@ -87,7 +143,16 @@ async def send_message(producer: AIOKafkaProducer, message: dict):
 
 async def consume():
     # Create topics before starting consumer
+    logger.info("Creating Kafka topics if needed...")
     await create_kafka_topics()
+    
+     # Wait for the receive topic to be available
+    logger.info(f"Verifying topic {KAFKA_TOPIC_RECIEVED} is available...")
+    topic_ready = await wait_for_topic(KAFKA_TOPIC_RECIEVED)
+    
+    if not topic_ready:
+        logger.error(f"Topic {KAFKA_TOPIC_RECIEVED} not available. Exiting.")
+        return
     
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC_RECIEVED,
