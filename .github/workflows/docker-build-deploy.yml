@@ -1,0 +1,69 @@
+name: Docker Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+
+env:
+  REGISTRY: ghcr.io
+  MOOD_IMAGE_NAME: nextgenaudio/mood-classifier-service
+  GENRE_IMAGE_NAME: nextgenaudio/genre-classifier-service
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Mood Service
+        id: meta-mood
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.MOOD_IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            latest
+
+      - name: Extract metadata (tags, labels) for Genre Service
+        id: meta-genre
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.GENRE_IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            latest
+
+      - name: Build and push Mood Classifier image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./mood-classifier-service
+          push: true
+          tags: ${{ steps.meta-mood.outputs.tags }}
+          labels: ${{ steps.meta-mood.outputs.labels }}
+
+      - name: Build and push Genre Classifier image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./genre-classifier-service
+          push: true
+          tags: ${{ steps.meta-genre.outputs.tags }}
+          labels: ${{ steps.meta-genre.outputs.labels }}
+
+  

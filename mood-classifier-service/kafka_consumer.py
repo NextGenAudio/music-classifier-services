@@ -5,6 +5,8 @@ import socket
 import ssl
 from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
+from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.errors import TopicAlreadyExistsError
 import logging
 from aws_msk_iam_sasl_signer import MSKAuthTokenProvider
 from predict_mood_v2 import feature_extractor, predict_mood_from_features, predict_mood_from_mp3
@@ -42,13 +44,51 @@ KAFKA_SECURITY_CONFIG = {
     'ssl_context': ssl_context
 }
 
+async def create_kafka_topics():
+    """Create Kafka topics if they don't exist"""
+    admin_client = AIOKafkaAdminClient(
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        **KAFKA_SECURITY_CONFIG
+    )
+    
+    try:
+        await admin_client.start()
+        logger.info("Admin client connected to Kafka")
+        
+        # Define topics to create
+        topics = [
+            NewTopic(
+                name=KAFKA_TOPIC_RECIEVED,
+                num_partitions=3
+            ),
+            NewTopic(
+                name=KAFKA_TOPIC_PROCESSED,
+                num_partitions=3
+            )
+        ]
+        
+        # Create topics
+        await admin_client.create_topics(topics)
+        logger.info(f"✓ Topics created: {KAFKA_TOPIC_RECIEVED}, {KAFKA_TOPIC_PROCESSED}")
+        
+    except TopicAlreadyExistsError:
+        logger.info("✓ Topics already exist")
+    except Exception as e:
+        logger.warning(f"Topic creation note: {e}")
+        # Don't fail if topics already exist or other non-critical errors
+    finally:
+        await admin_client.close()
+
 async def send_message(producer: AIOKafkaProducer, message: dict):
     """Send a JSON message to Kafka"""
     value_bytes = json.dumps(message).encode("utf-8")
-    print(f"Sending message to {KAFKA_TOPIC_PROCESSED}: {value_bytes}")
+    logger.info(f"Sending message to {KAFKA_TOPIC_PROCESSED}: {message}")
     await producer.send_and_wait(KAFKA_TOPIC_PROCESSED, value_bytes)
 
 async def consume():
+    # Create topics before starting consumer
+    await create_kafka_topics()
+    
     consumer = AIOKafkaConsumer(
         KAFKA_TOPIC_RECIEVED,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
@@ -60,8 +100,11 @@ async def consume():
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         **KAFKA_SECURITY_CONFIG
     )
+    
     await consumer.start()
     await producer.start()
+    logger.info("Consumer and Producer started successfully")
+    
     try:
         async for msg in consumer:
             logger.info(f"Received message: {msg.value}")
@@ -89,3 +132,5 @@ async def consume():
             logger.info(f"Processed message with mood: {mood}")
     finally:
         await consumer.stop()
+        await producer.stop()
+        logger.info("Consumer and Producer stopped")
