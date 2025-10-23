@@ -66,7 +66,8 @@ async def create_kafka_topics():
             topics_to_create.append(
                 NewTopic(
                     name=KAFKA_TOPIC_RECIEVED,
-                    num_partitions=3
+                    num_partitions=3,
+                    replication_factor=2  # MSK Serverless will manage this automatically
                 )
             )
             logger.info(f"Will create topic: {KAFKA_TOPIC_RECIEVED}")
@@ -78,7 +79,8 @@ async def create_kafka_topics():
             topics_to_create.append(
                 NewTopic(
                     name=KAFKA_TOPIC_PROCESSED,
-                    num_partitions=3
+                    num_partitions=3,
+                    replication_factor=2  # MSK Serverless will manage this automatically
                 )
             )
             logger.info(f"Will create topic: {KAFKA_TOPIC_PROCESSED}")
